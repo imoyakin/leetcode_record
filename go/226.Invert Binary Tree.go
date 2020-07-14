@@ -1,3 +1,5 @@
+package leetcode
+
 //翻转二叉树
 /**
  * Definition for a binary tree node.
@@ -7,14 +9,14 @@
  *     Right *TreeNode
  * }
  */
- func invertTree(root *TreeNode) *TreeNode {
-    if root == nil {
-        return root
-    }
-    invertTree(root.Left)
-    invertTree(root.Right)
-    if !(root.Left == nil && root.Right == nil ) {
-        root.Left, root.Right = root.Right, root.Left
-    }
-    return root
+func invertTree(root *TreeNode) *TreeNode {
+	if root == nil {
+		return root
+	}
+	invertTree(root.Left)
+	invertTree(root.Right)
+	if !(root.Left == nil && root.Right == nil) {
+		root.Left, root.Right = root.Right, root.Left
+	}
+	return root
 }
