@@ -1,10 +1,14 @@
-package raft
+package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"math/rand"
+	"net"
+	"net/http"
 	"net/rpc"
+	"strings"
 	"time"
 )
 
@@ -27,7 +31,7 @@ const (
 )
 
 //Raft node
-type raft struct {
+type Raft struct {
 	id int
 
 	state int
@@ -45,7 +49,7 @@ type raft struct {
 	nodes map[int]*node
 }
 
-func (r *raft) start() {
+func (r *Raft) start() {
 	r.state = follower
 	r.currentTerm = 0
 	r.votedFor = -1
@@ -103,7 +107,7 @@ type VoteReply struct {
 	VoteGranted bool
 }
 
-func (r *raft) broadcastRequestVote() {
+func (r *Raft) broadcastRequestVote() {
 	var args = VoteArgs{
 		Term:        r.currentTerm,
 		CandidateID: r.id,
@@ -117,7 +121,7 @@ func (r *raft) broadcastRequestVote() {
 	}
 }
 
-func (r *raft) sendRequestVote(serverID int, args VoteArgs, reply *VoteReply) {
+func (r *Raft) sendRequestVote(serverID int, args VoteArgs, reply *VoteReply) {
 	client, err := rpc.DialHTTP("tcp", r.nodes[serverID].address)
 	if err != nil {
 		log.Fatal(err)
@@ -140,7 +144,7 @@ func (r *raft) sendRequestVote(serverID int, args VoteArgs, reply *VoteReply) {
 	}
 }
 
-func (r *raft) RequestVote(args VoteArgs, reply *VoteReply) error {
+func (r *Raft) RequestVote(args VoteArgs, reply *VoteReply) error {
 
 	if args.Term < r.currentTerm {
 		reply.Term = r.currentTerm
@@ -170,7 +174,7 @@ type HeartbeatReply struct {
 	Term int
 }
 
-func (r *raft) broadcastHeartbeat() {
+func (r *Raft) broadcastHeartbeat() {
 	for i := range r.nodes {
 		args := HeartbeatArgs{
 			Term:     r.currentTerm,
@@ -184,7 +188,7 @@ func (r *raft) broadcastHeartbeat() {
 	}
 }
 
-func (r *raft) sendHeartbeat(serverID int, args HeartbeatArgs, reply *HeartbeatReply) {
+func (r *Raft) sendHeartbeat(serverID int, args HeartbeatArgs, reply *HeartbeatReply) {
 	client, err := rpc.DialHTTP("tcp", r.nodes[serverID].address)
 	if err != nil {
 		log.Fatal(err)
@@ -202,7 +206,7 @@ func (r *raft) sendHeartbeat(serverID int, args HeartbeatArgs, reply *HeartbeatR
 }
 
 // Heartbeat follower response
-func (r *raft) Heartbeat(args HeartbeatArgs, reply *HeartbeatReply) error {
+func (r *Raft) Heartbeat(args HeartbeatArgs, reply *HeartbeatReply) error {
 	if args.Term < r.currentTerm {
 		reply.Term = r.currentTerm
 		return nil
@@ -219,4 +223,39 @@ func (r *raft) Heartbeat(args HeartbeatArgs, reply *HeartbeatReply) error {
 	r.heartbeatC <- true
 
 	return nil
+}
+
+func (r *Raft) rpc(port string) {
+	rpc.Register(r)
+	rpc.HandleHTTP()
+	l, err := net.Listen("tcp", port)
+	if err != nil {
+		log.Fatal("listen err:", err)
+	}
+	go http.Serve(l, nil)
+}
+
+func main() {
+
+	// 参数定义和默认值
+	port := flag.String("port", ":9091", "rpc listen port")
+	cluster := flag.String("cluster", "127.0.0.1:9091", "comma sep")
+	id := flag.Int("id", 1, "node ID")
+
+	flag.Parse()
+	clusters := strings.Split(*cluster, ",")
+	ns := make(map[int]*node)
+	for k, v := range clusters {
+		ns[k] = newNode(v)
+	}
+
+	Raft := &Raft{}
+	Raft.id = *id
+	Raft.nodes = ns
+
+	Raft.rpc(*port)
+	Raft.start()
+
+	select {}
+
 }
