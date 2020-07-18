@@ -1,4 +1,4 @@
-package leetcode
+package tree
 
 //二叉树的直径
 /**
@@ -28,11 +28,4 @@ func dfs(root *TreeNode, ret *int) int {
 	r := dfs(root.Right, ret)
 	*ret = max(*ret, l+r)
 	return max(l, r) + 1
-}
-
-func max(l, r int) int {
-	if l > r {
-		return l
-	}
-	return r
 }
